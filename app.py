@@ -37,13 +37,27 @@ col1, col2 = st.columns(2)
 
 with col1:
     vessel_type = st.selectbox("Vessel (anatomical order)", VESSEL_OPTIONS)
-    distance = st.slider("Distance from Proximal End (mm)", 0, length, 50, 5, help=f"0 = Proximal (top), {length} = Distal (bottom)")
+    distance = st.slider("Distance from Proximal End (mm)", 0, length, 50, 5, help=f"0 = TOP (proximal), {length} = BOTTOM (distal)")
     st.caption(f"📍 {distance}mm from TOP")
 
 with col2:
-    hour = st.selectbox("Clock Position (12 = anterior)", [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], index=0)
+    # CLOCK POSITION - 6 = ANTERIOR
+    hour = st.selectbox("Clock Position (6 = anterior)", [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], index=6)
     clock_pos = 0 if hour == 12 else hour * 30
     st.success(f"Angle: {clock_pos}°")
+    
+    # Visual clock showing 6 as anterior
+    fig_clock, ax_clock = plt.subplots(figsize=(1.5, 1.5))
+    circle = plt.Circle((0, 0), 1, color='lightgray', fill=False)
+    ax_clock.add_patch(circle)
+    # Highlight 6 o'clock (anterior)
+    ax_clock.plot([0, 0], [-0.8, -1], 'r-', linewidth=3)
+    ax_clock.text(0, -1.1, '6\nANT', ha='center', va='center', color='red', fontweight='bold', fontsize=8)
+    ax_clock.set_xlim(-1.2, 1.2)
+    ax_clock.set_ylim(-1.2, 1.2)
+    ax_clock.axis('off')
+    st.pyplot(fig_clock)
+    
     fen_size = st.number_input("Fenestration Diameter (mm)", 4.0, 12.0, 6.0, 0.5)
 
 if st.button("➕ Add Fenestration"):
@@ -70,29 +84,34 @@ if 'fens' in st.session_state and st.session_state.fens:
 
 # --- LIVE VISUALIZATION ---
 st.header("3. Live Graft Preview")
-st.caption("PROXIMAL END IS AT TOP")
+st.caption("PROXIMAL END (0mm) IS AT TOP")
 
 if 'fens' in st.session_state and st.session_state.fens:
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.set_ylim(length, 0)
+    ax.set_ylim(length, 0)  # Invert Y: 0=top, length=bottom
+    
+    # Graft outline
     ax.plot([0, circumference, circumference, 0, 0], [0, 0, length, length, 0], 'k-', linewidth=3)
     
+    # Stent rings
     for i in range(0, length, 15):
         ax.plot([0, circumference], [i, i], 'gray', linestyle=':', alpha=0.5)
         ax.text(-8, i, f"{i}", ha='right', va='center', fontsize=8)
     
+    # Radiopaque markers
     for pos in [30, 60, 90, 120]:
         ax.plot([0, circumference], [pos, pos], 'gold', linewidth=4, alpha=0.8)
         ax.text(circumference + 5, pos, "MARKER", fontsize=8, color='gold', fontweight='bold')
     
+    # Labels
     ax.text(circumference/2, -8, "PROXIMAL END (0mm)", ha='center', fontsize=12, fontweight='bold', color='red', bbox=dict(boxstyle="round,pad=0.3", facecolor="pink"))
     ax.text(circumference/2, length+8, f"DISTAL END ({length}mm)", ha='center', fontsize=12, fontweight='bold', color='blue', bbox=dict(boxstyle="round,pad=0.3", facecolor="lightblue"))
     
+    # Fenestrations (NOW CORRECT: smaller distance = higher)
     colors = {"Celiac trunk": '#FF6B6B', "SMA": '#4ECDC4', "Right renal artery": '#45B7D1', "Left renal artery": '#96CEB4', "Accessory renal artery 1": '#FFEAA7', "Accessory renal artery 2": '#DDA0DD', "IMA": '#FFB347'}
-    
     for f in st.session_state.fens:
         x = (f['c'] / 360) * circumference
-        y = length - f['d']
+        y = f['d']  # FIXED: Direct mapping - smaller = higher
         circle = plt.Circle((x, y), f['s'], color=colors.get(f['v'], 'black'), alpha=0.6, fill=True)
         ax.add_patch(circle)
         
@@ -141,7 +160,7 @@ if st.button("🖨️ Create PDF", type="primary"):
     c.setStrokeColorRGB(0, 0, 0)
     for f in st.session_state.fens:
         x = x_offset + (f['c'] / 360) * width_mm
-        y = y_offset + (length - f['d'])
+        y = y_offset + f['d']  # FIXED: Direct mapping
         r = f['s']
         c.circle(x, y, r, stroke=1, fill=0)
         c.setFont("Helvetica-Bold", 7)
