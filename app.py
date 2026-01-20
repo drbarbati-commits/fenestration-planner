@@ -41,13 +41,27 @@ with col1:
     st.caption(f"📍 {distance}mm from TOP")
 
 with col2:
+    # CLOCK: 6 = anterior = 0°
     hour = st.selectbox("Clock Position (6 = anterior)", [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], index=6)
-    clock_pos = 0 if hour == 12 else hour * 30
+    # CONVERSION: 6 o'clock = 0°, 12 o'clock = 180°
+    clock_pos = ((hour - 6) % 12) * 30  # 6=0°, 12=180°, 3=90°, 9=270°
     st.success(f"Angle: {clock_pos}°")
+    
+    # Visual clock showing 6 as anterior
+    fig_clock, ax_clock = plt.subplots(figsize=(1.5, 1.5))
+    circle = plt.Circle((0, 0), 1, color='lightgray', fill=False)
+    ax_clock.add_patch(circle)
+    ax_clock.plot([0, 0], [-0.8, -1], 'r-', linewidth=3)
+    ax_clock.text(0, -1.1, '6\nANT', ha='center', va='center', color='red', fontweight='bold', fontsize=8)
+    ax_clock.set_xlim(-1.2, 1.2)
+    ax_clock.set_ylim(-1.2, 1.2)
+    ax_clock.axis('off')
+    st.pyplot(fig_clock)
+    
     fen_size = st.number_input("Fenestration Diameter (mm)", 4.0, 12.0, 6.0, 0.5)
 
 if st.button("➕ Add Fenestration"):
-    if 'fens' not in st.state:
+    if 'fens' not in st.session_state:
         st.session_state.fens = []
     for f in st.session_state.fens:
         if abs(f['d'] - distance) < 4:
@@ -61,25 +75,22 @@ if st.button("➕ Add Fenestration"):
 if 'fens' in st.session_state and st.session_state.fens:
     st.write("Current Fenestrations:")
     for i, f in enumerate(st.session_state.fens):
-        hour_disp = "12" if f['c'] == 0 else str(int(f['c'] / 30))
+        hour_display = "6" if f['c'] == 0 else str(int(((f['c']/30) + 6) % 12))
         col1, col2 = st.columns([5, 1])
-        col1.write(f"🔴 {VESSEL_SHORT[f['v']]} | @{f['d']}mm | {hour_disp} o'clock | Ø{f['s']}mm")
+        col1.write(f"🔴 {VESSEL_SHORT[f['v']]} | @{f['d']}mm | {hour_display} o'clock | Ø{f['s']}mm")
         if col2.button("Delete", key=f"del_{i}"):
             st.session_state.fens.pop(i)
             st.rerun()
 
 # --- LIVE VISUALIZATION ---
 st.header("3. Live Graft Preview")
-st.caption("PROXIMAL END (0mm) IS AT TOP")
 
 if 'fens' in st.session_state and st.session_state.fens:
     fig, ax = plt.subplots(figsize=(10, 6))
-    
-    # EXPLICIT: Set limits BEFORE adding anything
     ax.set_xlim(0, circumference)
-    ax.set_ylim(0, length)  # NORMAL orientation: 0=bottom, length=top
+    ax.set_ylim(0, length)
     
-    # Draw graft outline
+    # Graft outline
     ax.plot([0, circumference, circumference, 0, 0], [0, 0, length, length, 0], 'k-', linewidth=3)
     
     # Stent rings
@@ -92,31 +103,36 @@ if 'fens' in st.session_state and st.session_state.fens:
         ax.plot([0, circumference], [pos, pos], 'gold', linewidth=4, alpha=0.8)
         ax.text(circumference + 5, pos, "MARKER", fontsize=8, color='gold', fontweight='bold')
     
-    # Labels
-    ax.text(circumference/2, -8, "PROXIMAL END (0mm)", ha='center', fontsize=12, fontweight='bold', color='red', bbox=dict(boxstyle="round,pad=0.3", facecolor="pink"))
-    ax.text(circumference/2, length+8, f"DISTAL END ({length}mm)", ha='center', fontsize=12, fontweight='bold', color='blue', bbox=dict(boxstyle="round,pad=0.3", facecolor="lightblue"))
+    # Title in upper-left
+    ax.text(5, length - 10, f"UNROLLED GRAFT\n{diameter}mm × {length}mm", fontsize=12, fontweight='bold', 
+            bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
     
-    # Invert the axis AFTER adding all elements
-    ax.invert_yaxis()
+    # Proximal label in upper-right
+    ax.text(circumference - 10, length - 10, "PROXIMAL END\n(0mm)", ha='right', fontsize=11, fontweight='bold', 
+            color='red', bbox=dict(boxstyle="round,pad=0.3", facecolor="pink", alpha=0.7))
     
-    # Fenestrations (NOW correct: smaller distance = higher)
+    # Distal label in lower-right
+    ax.text(circumference - 10, 10, "DISTAL END\n({}mm)".format(length), ha='right', fontsize=11, fontweight='bold', 
+            color='blue', bbox=dict(boxstyle="round,pad=0.3", facecolor="lightblue", alpha=0.7))
+    
+    # Fenestrations (smaller distance = higher position)
     colors = {"Celiac trunk": '#FF6B6B', "SMA": '#4ECDC4', "Right renal artery": '#45B7D1', "Left renal artery": '#96CEB4', "Accessory renal artery 1": '#FFEAA7', "Accessory renal artery 2": '#DDA0DD', "IMA": '#FFB347'}
     for f in st.session_state.fens:
         x = (f['c'] / 360) * circumference
-        y = f['d']  # Direct mapping: 0=bottom, length=top, then invert_yaxis flips it
+        y = f['d']
         circle = plt.Circle((x, y), f['s'], color=colors.get(f['v'], 'black'), alpha=0.6, fill=True)
         ax.add_patch(circle)
         
-        hour_disp = "12" if f['c'] == 0 else str(int(f['c'] / 30))
-        ax.text(x, y, VESSEL_SHORT[f['v']], ha='center', va='center', fontsize=9, fontweight='bold', color='white', bbox=dict(boxstyle="round,pad=0.2", facecolor="black", alpha=0.5))
-        ax.text(x, y + f['s'] + 3, f"Ø{f['s']}mm @{f['d']}mm\n{hour_disp} o'clock", ha='center', fontsize=7)
+        hour_display = "6" if f['c'] == 0 else str(int(((f['c']/30) + 6) % 12))
+        ax.text(x, y, VESSEL_SHORT[f['v']], ha='corner', va='center', fontsize=9, fontweight='bold', 
+                color='white', bbox=dict(boxstyle="round,pad=0.2', facecolor="black", alpha=0.5))
+        ax.text(x, y + f['s'] + 3, f"Ø{f['s']}mm @{f['d']}mm\n{hour_display} o'clock", ha='center', fontsize=7)
+    
+    ax.invert_yaxis()  # Flip AFTER adding elements
     
     ax.set_xlabel("Circumference (mm)", fontsize=12)
     ax.set_ylabel("Distance from Proximal End (mm)", fontsize=12)
-    ax.set_title(f"UNROLLED GRAFT\n{diameter}mm × {length}mm | Scale 1:1", fontsize=14, fontweight='bold')
     ax.grid(True, alpha=0.3)
-    ax.plot([10, 20], [length-10, length-10], 'k-', linewidth=4)
-    ax.text(15, length-15, "10mm", ha='center', fontsize=10, fontweight='bold')
     
     st.pyplot(fig)
 else:
@@ -151,7 +167,7 @@ if st.button("🖨️ Create PDF", type="primary"):
     c.setStrokeColorRGB(0, 0, 0)
     for f in st.session_state.fens:
         x = x_offset + (f['c'] / 360) * width_mm
-        y = y_offset + (height_mm - f['d'])  # PDF: 0 at bottom, length at top
+        y = y_offset + (height_mm - f['d'])
         r = f['s']
         c.circle(x, y, r, stroke=1, fill=0)
         c.setFont("Helvetica-Bold", 7)
