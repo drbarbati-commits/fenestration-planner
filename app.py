@@ -41,23 +41,9 @@ with col1:
     st.caption(f"📍 {distance}mm from TOP")
 
 with col2:
-    # CLOCK: 6 = anterior = 0°
-    hour = st.selectbox("Clock Position (6 = anterior)", [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], index=6)
-    # CONVERSION: 6 o'clock = 0°, 12 o'clock = 180°
-    clock_pos = ((hour - 6) % 12) * 30  # 6=0°, 12=180°, 3=90°, 9=270°
+    hour = st.selectbox("Clock Position (12 = anterior)", [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], index=0)
+    clock_pos = 0 if hour == 12 else hour * 30
     st.success(f"Angle: {clock_pos}°")
-    
-    # Visual clock showing 6 as anterior
-    fig_clock, ax_clock = plt.subplots(figsize=(1.5, 1.5))
-    circle = plt.Circle((0, 0), 1, color='lightgray', fill=False)
-    ax_clock.add_patch(circle)
-    ax_clock.plot([0, 0], [-0.8, -1], 'r-', linewidth=3)
-    ax_clock.text(0, -1.1, '6\nANT', ha='center', va='center', color='red', fontweight='bold', fontsize=8)
-    ax_clock.set_xlim(-1.2, 1.2)
-    ax_clock.set_ylim(-1.2, 1.2)
-    ax_clock.axis('off')
-    st.pyplot(fig_clock)
-    
     fen_size = st.number_input("Fenestration Diameter (mm)", 4.0, 12.0, 6.0, 0.5)
 
 if st.button("➕ Add Fenestration"):
@@ -75,14 +61,14 @@ if st.button("➕ Add Fenestration"):
 if 'fens' in st.session_state and st.session_state.fens:
     st.write("Current Fenestrations:")
     for i, f in enumerate(st.session_state.fens):
-        hour_display = "6" if f['c'] == 0 else str(int(((f['c']/30) + 6) % 12))
+        hour_disp = "12" if f['c'] == 0 else str(int(f['c'] / 30))
         col1, col2 = st.columns([5, 1])
-        col1.write(f"🔴 {VESSEL_SHORT[f['v']]} | @{f['d']}mm | {hour_display} o'clock | Ø{f['s']}mm")
+        col1.write(f"🔴 {VESSEL_SHORT[f['v']]} | @{f['d']}mm | {hour_disp} o'clock | Ø{f['s']}mm")
         if col2.button("Delete", key=f"del_{i}"):
             st.session_state.fens.pop(i)
             st.rerun()
 
-# --- LIVE VISUALIZATION ---
+# --- LIVE VISUALIZATION (12 CENTERED) ---
 st.header("3. Live Graft Preview")
 
 if 'fens' in st.session_state and st.session_state.fens:
@@ -103,33 +89,24 @@ if 'fens' in st.session_state and st.session_state.fens:
         ax.plot([0, circumference], [pos, pos], 'gold', linewidth=4, alpha=0.8)
         ax.text(circumference + 5, pos, "MARKER", fontsize=8, color='gold', fontweight='bold')
     
-    # Title in upper-left
-    ax.text(5, length - 10, f"UNROLLED GRAFT\n{diameter}mm × {length}mm", fontsize=12, fontweight='bold', 
-            bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
+    # Labels
+    ax.text(5, length - 10, f"UNROLLED GRAFT\n{diameter}mm × {length}mm", fontsize=12, fontweight='bold')
+    ax.text(circumference - 10, length - 10, "PROXIMAL END\n(0mm)", ha='right', fontsize=11, fontweight='bold', color='red')
+    ax.text(circumference - 10, 10, "DISTAL END\n({}mm)".format(length), ha='right', fontsize=11, fontweight='bold', color='blue')
     
-    # Proximal label in upper-right
-    ax.text(circumference - 10, length - 10, "PROXIMAL END\n(0mm)", ha='right', fontsize=11, fontweight='bold', 
-            color='red', bbox=dict(boxstyle="round,pad=0.3", facecolor="pink", alpha=0.7))
-    
-    # Distal label in lower-right
-    ax.text(circumference - 10, 10, "DISTAL END\n({}mm)".format(length), ha='right', fontsize=11, fontweight='bold', 
-            color='blue', bbox=dict(boxstyle="round,pad=0.3", facecolor="lightblue", alpha=0.7))
-    
-    # Fenestrations (smaller distance = higher position)
+    # Fenestrations with 12-centered mapping
     colors = {"Celiac trunk": '#FF6B6B', "SMA": '#4ECDC4', "Right renal artery": '#45B7D1', "Left renal artery": '#96CEB4', "Accessory renal artery 1": '#FFEAA7', "Accessory renal artery 2": '#DDA0DD', "IMA": '#FFB347'}
     for f in st.session_state.fens:
-        x = (f['c'] / 360) * circumference
+        x = ((f['c'] + 180) % 360) / 360 * circumference
         y = f['d']
         circle = plt.Circle((x, y), f['s'], color=colors.get(f['v'], 'black'), alpha=0.6, fill=True)
         ax.add_patch(circle)
         
-        hour_display = "6" if f['c'] == 0 else str(int(((f['c']/30) + 6) % 12))
-        # SIMPLIFIED: Remove bbox parameters
-        ax.text(x, y, VESSEL_SHORT[f['v']], ha='center', va='center', fontsize=9, fontweight='bold', color='black')
-        ax.text(x, y + f['s'] + 3, f"Ø{f['s']}mm @{f['d']}mm\n{hour_display} o'clock", ha='center', fontsize=7)
+        hour_disp = "12" if f['c'] == 0 else str(int(f['c'] / 30))
+        ax.text(x, y, VESSEL_SHORT[f['v']], ha='center', va='center', fontsize=9, fontweight='bold')
+        ax.text(x, y + f['s'] + 3, f"Ø{f['s']}mm @{f['d']}mm\n{hour_disp} o'clock", ha='center', fontsize=7)
     
-    ax.invert_yaxis()  # Flip AFTER adding elements
-    
+    ax.invert_yaxis()
     ax.set_xlabel("Circumference (mm)", fontsize=12)
     ax.set_ylabel("Distance from Proximal End (mm)", fontsize=12)
     ax.grid(True, alpha=0.3)
