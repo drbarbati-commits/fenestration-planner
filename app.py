@@ -81,7 +81,7 @@ if 'fens' in st.session_state and st.session_state.fens:
             st.session_state.fens.pop(i)
             st.rerun()
 
-# --- LIVE VISUALIZATION ---
+# --- LIVE VISUALIZATION (12 CENTERED) ---
 st.header("3. Live Graft Preview")
 
 if 'fens' in st.session_state and st.session_state.fens:
@@ -112,17 +112,18 @@ if 'fens' in st.session_state and st.session_state.fens:
     ax.text(circumference - 10, 10, "DISTAL END\n({}mm)".format(length), ha='right', fontsize=11, fontweight='bold', 
             color='blue', bbox=dict(boxstyle="round,pad=0.3", facecolor="lightblue", alpha=0.7))
     
-    # Fenestrations
+    # Fenestrations with 12-centered mapping
     colors = {"Celiac trunk": '#FF6B6B', "SMA": '#4ECDC4', "Right renal artery": '#45B7D1', "Left renal artery": '#96CEB4', "Accessory renal artery 1": '#FFEAA7', "Accessory renal artery 2": '#DDA0DD', "IMA": '#FFB347'}
     for f in st.session_state.fens:
-        x = (f['c'] / 360) * circumference
+        # NEW MAPPING: 12 o'clock (0°) at center, 6 (180°) at edges
+        x = ((f['c'] + 180) % 360) / 360 * circumference
         y = f['d']
         circle = plt.Circle((x, y), f['s'], color=colors.get(f['v'], 'black'), alpha=0.6, fill=True)
         ax.add_patch(circle)
         
         hour_display = "12" if f['c'] == 0 else str(int(f['c'] / 30))
         ax.text(x, y, VESSEL_SHORT[f['v']], ha='center', va='center', fontsize=9, fontweight='bold', 
-                color='white', bbox=dict(boxstyle="round,pad=0.2", facecolor="black", alpha=0.5))
+                color='white', bbox=dict(boxstyle="round,pad=0.2', facecolor='black", alpha=0.5))
         ax.text(x, y + f['s'] + 3, f"Ø{f['s']}mm @{f['d']}mm\n{hour_display} o'clock", ha='center', fontsize=7)
     
     ax.invert_yaxis()  # Flip AFTER adding elements
@@ -163,7 +164,7 @@ if st.button("🖨️ Create PDF", type="primary"):
     
     c.setStrokeColorRGB(0, 0, 0)
     for f in st.session_state.fens:
-        x = x_offset + (f['c'] / 360) * width_mm
+        x = x_offset + ((f['c'] + 180) % 360) / 360 * width_mm
         y = y_offset + (height_mm - f['d'])
         r = f['s']
         c.circle(x, y, r, stroke=1, fill=0)
