@@ -41,12 +41,11 @@ with col1:
     st.caption(f"📍 {distance}mm from TOP")
 
 with col2:
-    # STANDARD CLOCK: 12 = anterior = 0°
     hour = st.selectbox("Clock Position (12 = anterior)", [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], index=0)
     clock_pos = 0 if hour == 12 else hour * 30
     st.success(f"Angle: {clock_pos}°")
     
-    # Visual clock showing 12 as anterior
+    # Visual clock
     fig_clock, ax_clock = plt.subplots(figsize=(1.5, 1.5))
     circle = plt.Circle((0, 0), 1, color='lightgray', fill=False)
     ax_clock.add_patch(circle)
@@ -115,16 +114,16 @@ if 'fens' in st.session_state and st.session_state.fens:
     # Fenestrations with 12-centered mapping
     colors = {"Celiac trunk": '#FF6B6B', "SMA": '#4ECDC4', "Right renal artery": '#45B7D1', "Left renal artery": '#96CEB4', "Accessory renal artery 1": '#FFEAA7', "Accessory renal artery 2": '#DDA0DD', "IMA": '#FFB347'}
     for f in st.session_state.fens:
-        # NEW MAPPING: 12 o'clock (0°) at center, 6 (180°) at edges
+        # 12-centered: ((angle + 180) % 360) / 360
         x = ((f['c'] + 180) % 360) / 360 * circumference
         y = f['d']
         circle = plt.Circle((x, y), f['s'], color=colors.get(f['v'], 'black'), alpha=0.6, fill=True)
         ax.add_patch(circle)
         
-        hour_display = "12" if f['c'] == 0 else str(int(f['c'] / 30))
+        hour_disp = "12" if f['c'] == 0 else str(int(f['c'] / 30))
         ax.text(x, y, VESSEL_SHORT[f['v']], ha='center', va='center', fontsize=9, fontweight='bold', 
-                color='white', bbox=dict(boxstyle="round,pad=0.2', facecolor='black", alpha=0.5))
-        ax.text(x, y + f['s'] + 3, f"Ø{f['s']}mm @{f['d']}mm\n{hour_display} o'clock", ha='center', fontsize=7)
+                color='white', bbox=dict(boxstyle="round,pad=0.2", facecolor="black", alpha=0.5))
+        ax.text(x, y + f['s'] + 3, f"Ø{f['s']}mm @{f['d']}mm\n{hour_disp} o'clock", ha='center', fontsize=7)
     
     ax.invert_yaxis()  # Flip AFTER adding elements
     
