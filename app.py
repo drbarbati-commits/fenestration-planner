@@ -37,7 +37,7 @@ col1, col2 = st.columns(2)
 
 with col1:
     vessel_type = st.selectbox("Vessel (anatomical order)", VESSEL_OPTIONS)
-    distance = st.slider("Distance from Proximal End (mm)", 0, length, 50, 5, help=f"0 = TOP (proximal), {length} = BOTTOM (distal)")
+    distance = st.slider("Distance from Proximal End (mm)", 0, length, 50, 5, help=f"0 = Proximal (top), {length} = Distal (bottom)")
     st.caption(f"📍 {distance}mm from TOP")
 
 with col2:
@@ -68,48 +68,45 @@ if 'fens' in st.session_state and st.session_state.fens:
             st.session_state.fens.pop(i)
             st.rerun()
 
-# --- LIVE VISUALIZATION (12 CENTERED) ---
+# --- LIVE VISUALIZATION ---
 st.header("3. Live Graft Preview")
+st.caption("PROXIMAL END IS AT TOP")
 
 if 'fens' in st.session_state and st.session_state.fens:
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.set_xlim(0, circumference)
-    ax.set_ylim(0, length)
-    
-    # Graft outline
+    ax.set_ylim(length, 0)
     ax.plot([0, circumference, circumference, 0, 0], [0, 0, length, length, 0], 'k-', linewidth=3)
     
-    # Stent rings
     for i in range(0, length, 15):
         ax.plot([0, circumference], [i, i], 'gray', linestyle=':', alpha=0.5)
         ax.text(-8, i, f"{i}", ha='right', va='center', fontsize=8)
     
-    # Radiopaque markers
     for pos in [30, 60, 90, 120]:
         ax.plot([0, circumference], [pos, pos], 'gold', linewidth=4, alpha=0.8)
         ax.text(circumference + 5, pos, "MARKER", fontsize=8, color='gold', fontweight='bold')
     
-    # Labels
-    ax.text(5, length - 10, f"UNROLLED GRAFT\n{diameter}mm × {length}mm", fontsize=12, fontweight='bold')
-    ax.text(circumference - 10, length - 10, "PROXIMAL END\n(0mm)", ha='right', fontsize=11, fontweight='bold', color='red')
-    ax.text(circumference - 10, 10, "DISTAL END\n({}mm)".format(length), ha='right', fontsize=11, fontweight='bold', color='blue')
+    ax.text(circumference/2, -8, "PROXIMAL END (0mm)", ha='center', fontsize=12, fontweight='bold', color='red', bbox=dict(boxstyle="round,pad=0.3", facecolor="pink"))
+    ax.text(circumference/2, length+8, f"DISTAL END ({length}mm)", ha='center', fontsize=12, fontweight='bold', color='blue', bbox=dict(boxstyle="round,pad=0.3", facecolor="lightblue"))
     
-    # Fenestrations with 12-centered mapping
     colors = {"Celiac trunk": '#FF6B6B', "SMA": '#4ECDC4', "Right renal artery": '#45B7D1', "Left renal artery": '#96CEB4', "Accessory renal artery 1": '#FFEAA7', "Accessory renal artery 2": '#DDA0DD', "IMA": '#FFB347'}
+    
     for f in st.session_state.fens:
-        x = ((f['c'] + 180) % 360) / 360 * circumference
-        y = f['d']
+        x = (f['c'] / 360) * circumference
+        y = length - f['d']
         circle = plt.Circle((x, y), f['s'], color=colors.get(f['v'], 'black'), alpha=0.6, fill=True)
         ax.add_patch(circle)
         
         hour_disp = "12" if f['c'] == 0 else str(int(f['c'] / 30))
-        ax.text(x, y, VESSEL_SHORT[f['v']], ha='center', va='center', fontsize=9, fontweight='bold')
+        ax.text(x, y, VESSEL_SHORT[f['v']], ha='center', va='center', fontsize=9, fontweight='bold', color='white', bbox=dict(boxstyle="round,pad=0.2", facecolor="black", alpha=0.5))
         ax.text(x, y + f['s'] + 3, f"Ø{f['s']}mm @{f['d']}mm\n{hour_disp} o'clock", ha='center', fontsize=7)
     
-    ax.invert_yaxis()
+    ax.set_xlim(0, circumference)
     ax.set_xlabel("Circumference (mm)", fontsize=12)
     ax.set_ylabel("Distance from Proximal End (mm)", fontsize=12)
+    ax.set_title(f"UNROLLED GRAFT\n{diameter}mm × {length}mm | Scale 1:1", fontsize=14, fontweight='bold')
     ax.grid(True, alpha=0.3)
+    ax.plot([10, 20], [length-10, length-10], 'k-', linewidth=4)
+    ax.text(15, length-15, "10mm", ha='center', fontsize=10, fontweight='bold')
     
     st.pyplot(fig)
 else:
@@ -143,8 +140,8 @@ if st.button("🖨️ Create PDF", type="primary"):
     
     c.setStrokeColorRGB(0, 0, 0)
     for f in st.session_state.fens:
-        x = x_offset + ((f['c'] + 180) % 360) / 360 * width_mm
-        y = y_offset + (height_mm - f['d'])
+        x = x_offset + (f['c'] / 360) * width_mm
+        y = y_offset + (length - f['d'])
         r = f['s']
         c.circle(x, y, r, stroke=1, fill=0)
         c.setFont("Helvetica-Bold", 7)
