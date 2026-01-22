@@ -68,16 +68,19 @@ if 'fens' in st.session_state and st.session_state.fens:
             st.session_state.fens.pop(i)
             st.rerun()
 
-# --- LIVE VISUALIZATION (12 CENTERED) ---
+# --- LIVE VISUALIZATION (12 CENTERED, CORRECT ORIENTATION) ---
 st.header("3. Live Graft Preview")
-st.caption("❗12 o'clock (anterior) is at CENTER of graft")
+st.caption("❗12 o'clock (anterior) at center | PROXIMAL (0mm) at TOP")
 
 if 'fens' in st.session_state and st.session_state.fens:
     fig, ax = plt.subplots(figsize=(10, 6))
     
-    # Draw unrolled graft rectangle
+    # CRITICAL: Set limits BEFORE adding elements
     ax.set_xlim(0, circumference)
-    ax.set_ylim(length, 0)  # Invert Y: proximal at top
+    ax.set_ylim(0, length)  # Normal: 0=bottom, length=top
+    
+    # CRITICAL: Set equal aspect ratio to fix oval/circle issue
+    ax.set_aspect('equal')
     
     # Graft outline
     ax.plot([0, circumference, circumference, 0, 0], [0, 0, length, length, 0], 'k-', linewidth=3)
@@ -96,17 +99,22 @@ if 'fens' in st.session_state and st.session_state.fens:
     ax.text(circumference/2, -8, "PROXIMAL END (0mm)", ha='center', fontsize=12, fontweight='bold', color='red')
     ax.text(circumference/2, length+8, f"DISTAL END ({length}mm)", ha='center', fontsize=12, fontweight='bold', color='blue')
     
-    # Fenestrations with 12-centered mapping: ((angle + 180) % 360) / 360
+    # Fenestrations: 12-centered mapping + correct Y-position
     colors = {"Celiac trunk": '#FF6B6B', "SMA": '#4ECDC4', "Right renal artery": '#45B7D1', "Left renal artery": '#96CEB4', "Accessory renal artery 1": '#FFEAA7', "Accessory renal artery 2": '#DDA0DD', "IMA": '#FFB347'}
     for f in st.session_state.fens:
+        # X: 12-centered mapping
         x = ((f['c'] + 180) % 360) / 360 * circumference
-        y = length - f['d']  # Invert Y for proximal at top
+        # Y: Direct mapping (0=bottom, length=top), then invert axis
+        y = f['d']
         circle = plt.Circle((x, y), f['s'], color=colors.get(f['v'], 'black'), alpha=0.6, fill=True)
         ax.add_patch(circle)
         
         hour_disp = "12" if f['c'] == 0 else str(int(f['c'] / 30))
         ax.text(x, y, VESSEL_SHORT[f['v']], ha='center', va='center', fontsize=9, fontweight='bold', color='black')
         ax.text(x, y + f['s'] + 3, f"Ø{f['s']}mm @{f['d']}mm\n{hour_disp} o'clock", ha='center', fontsize=7)
+    
+    # CRITICAL: Invert Y-axis AFTER adding all elements
+    ax.invert_yaxis()
     
     ax.set_xlabel("Circumference (mm)", fontsize=12)
     ax.set_ylabel("Distance from Proximal End (mm)", fontsize=12)
